@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-schedule",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-odds",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-injuries",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/run-predictions",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/provider-health",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
