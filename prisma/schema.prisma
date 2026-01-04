@@ -1,0 +1,483 @@
+// NFL Forecasting MVP - Prisma Schema
+// Optimized for data freshness tracking and provider abstraction
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+model Sport {
+  id        String   @id @default(cuid())
+  name      String   @unique // "NFL", "NBA", etc.
+  slug      String   @unique // "nfl", "nba"
+  isActive  Boolean  @default(true)
+  leagues   League[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sports")
+}
+
+model League {
+  id        String   @id @default(cuid())
+  sportId   String
+  sport     Sport    @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  name      String   // "National Football League"
+  slug      String   @unique // "nfl"
+  season    Int      // 2025, 2026
+  isActive  Boolean  @default(true)
+  teams     Team[]
+  games     Game[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sportId, season])
+  @@map("leagues")
+}
+
+model Team {
+  id               String            @id @default(cuid())
+  leagueId         String
+  league           League            @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  name             String            // "Kansas City Chiefs"
+  city             String            // "Kansas City"
+  abbreviation     String            // "KC"
+  slug             String            // "kc-chiefs"
+  logoUrl          String?
+  primaryColor     String?
+  secondaryColor   String?
+  venueId          String?
+  venue            Venue?            @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  homeGames        Game[]            @relation("HomeTeam")
+  awayGames        Game[]            @relation("AwayTeam")
+  players          Player[]
+  teamGameStats    TeamGameStats[]
+  injuries         Injury[]
+  teamStrengthElo  TeamStrengthElo[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([leagueId, slug])
+  @@map("teams")
+}
+
+model Venue {
+  id               String             @id @default(cuid())
+  name             String             // "Arrowhead Stadium"
+  slug             String             @unique
+  city             String
+  state            String?
+  country          String             @default("USA")
+  isDome           Boolean            @default(false)
+  isRetractableRoof Boolean           @default(false)
+  surfaceType      String?            // "Grass", "Turf"
+  latitude         Float?
+  longitude        Float?
+  teams            Team[]
+  games            Game[]
+  weatherSnapshots WeatherSnapshot[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@map("venues")
+}
+
+model Player {
+  id              String           @id @default(cuid())
+  teamId          String
+  team            Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  position        String           // "QB", "RB", "WR", etc.
+  jerseyNumber    String?
+  isActive        Boolean          @default(true)
+  playerGameStats PlayerGameStats[]
+  injuries        Injury[]
+  propsSnapshots  PropSnapshot[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([teamId, firstName, lastName])
+  @@map("players")
+}
+
+// ============================================================================
+// GAMES & SCHEDULE
+// ============================================================================
+
+model Game {
+  id                   String                 @id @default(cuid())
+  leagueId             String
+  league               League                 @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeamId           String
+  homeTeam             Team                   @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeamId           String
+  awayTeam             Team                   @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  venueId              String?
+  venue                Venue?                 @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  scheduledTime        DateTime               // Kickoff time
+  week                 Int                    // Week number
+  seasonType           String                 @default("REG") // "PRE", "REG", "POST"
+  status               String                 @default("scheduled") // "scheduled", "final", "postponed", "cancelled"
+  homeScore            Int?
+  awayScore            Int?
+  // Data freshness tracking
+  dataSource           String?                // Provider name
+  dataFetchedAt        DateTime?              // When was this game data last synced
+  teamGameStats        TeamGameStats[]
+  playerGameStats      PlayerGameStats[]
+  oddsSnapshots        OddsSnapshot[]
+  weatherSnapshots     WeatherSnapshot[]
+  modelRuns            ModelRun[]
+  externalFactorScores ExternalFactorScore[]
+  newsItems            NewsItem[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@unique([leagueId, homeTeamId, awayTeamId, scheduledTime])
+  @@index([scheduledTime])
+  @@index([status])
+  @@map("games")
+}
+
+// ============================================================================
+// STATS
+// ============================================================================
+
+model TeamGameStats {
+  id                  String   @id @default(cuid())
+  gameId              String
+  game                Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  teamId              String
+  team                Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  // Offense
+  totalYards          Int?
+  passingYards        Int?
+  rushingYards        Int?
+  turnovers           Int?
+  passCompletions     Int?
+  passAttempts        Int?
+  rushAttempts        Int?
+  timeOfPossession    Int?     // seconds
+  thirdDownConversions Int?
+  thirdDownAttempts   Int?
+  redZoneAttempts     Int?
+  redZoneScores       Int?
+  // Defense
+  sacks               Float?
+  tacklesForLoss      Int?
+  qbHits              Int?
+  passesDefended      Int?
+  // Special Teams
+  fieldGoalsMade      Int?
+  fieldGoalsAttempted Int?
+  // Data freshness
+  dataSource          String?
+  dataFetchedAt       DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([gameId, teamId])
+  @@index([teamId])
+  @@map("team_game_stats")
+}
+
+model PlayerGameStats {
+  id            String   @id @default(cuid())
+  gameId        String
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  // Passing
+  passYards     Int?
+  passTDs       Int?
+  interceptions Int?
+  passAttempts  Int?
+  passCompletions Int?
+  // Rushing
+  rushYards     Int?
+  rushTDs       Int?
+  rushAttempts  Int?
+  // Receiving
+  receptions    Int?
+  recYards      Int?
+  recTDs        Int?
+  targets       Int?
+  // Data freshness
+  dataSource    String?
+  dataFetchedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([gameId, playerId])
+  @@index([playerId])
+  @@map("player_game_stats")
+}
+
+// Team strength rating (ELO-like system)
+model TeamStrengthElo {
+  id            String   @id @default(cuid())
+  teamId        String
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  season        Int
+  week          Int
+  eloRating     Float    // 1500 baseline
+  offenseRating Float?
+  defenseRating Float?
+  // Data freshness
+  dataSource    String?
+  calculatedAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([teamId, season, week])
+  @@index([teamId, season])
+  @@map("team_strength_elo")
+}
+
+// ============================================================================
+// INJURIES
+// ============================================================================
+
+model Injury {
+  id              String    @id @default(cuid())
+  playerId        String
+  player          Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  teamId          String
+  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  description     String    // "Knee injury"
+  designation     String    // "OUT", "QUESTIONABLE", "DOUBTFUL", "PROBABLE"
+  reportedDate    DateTime
+  resolvedDate    DateTime?
+  impactScore     Float?    @default(0) // 0-100, calculated based on player importance
+  isResolved      Boolean   @default(false)
+  // Data freshness
+  dataSource      String?
+  dataFetchedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([playerId])
+  @@index([teamId, isResolved])
+  @@index([dataFetchedAt])
+  @@map("injuries")
+}
+
+// ============================================================================
+// ODDS
+// ============================================================================
+
+model OddsSnapshot {
+  id                String   @id @default(cuid())
+  gameId            String
+  game              Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  providerName      String   // "DraftKings", "FanDuel", etc.
+  // Moneyline
+  homeMoneyline     Int?
+  awayMoneyline     Int?
+  // Spread
+  homeSpread        Float?
+  homeSpreadOdds    Int?     // -110
+  awaySpread        Float?
+  awaySpreadOdds    Int?
+  // Total
+  overUnder         Float?
+  overOdds          Int?
+  underOdds         Int?
+  // Metadata
+  dataSource        String?
+  dataFetchedAt     DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([gameId, dataFetchedAt(sort: Desc)])
+  @@index([providerName])
+  @@map("odds_snapshots")
+}
+
+// Player props (optional, for future expansion)
+model PropSnapshot {
+  id            String   @id @default(cuid())
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  propType      String   // "PassingYards", "RushingYards", "TDs"
+  line          Float    // 250.5
+  overOdds      Int?
+  underOdds     Int?
+  providerName  String
+  dataSource    String?
+  dataFetchedAt DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([playerId, propType])
+  @@map("prop_snapshots")
+}
+
+// ============================================================================
+// WEATHER
+// ============================================================================
+
+model WeatherSnapshot {
+  id                   String   @id @default(cuid())
+  venueId              String
+  venue                Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  gameId               String?
+  game                 Game?    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  forecastTime         DateTime // When this forecast is for
+  temperature          Float?   // Fahrenheit
+  feelsLike            Float?
+  windSpeed            Float?   // mph
+  windGust             Float?
+  windDirection        String?
+  precipProbability    Float?   // 0-100
+  precipType           String?  // "rain", "snow"
+  humidity             Float?
+  condition            String?  // "Clear", "Cloudy", "Rain"
+  severityScore        Float?   @default(0) // 0-100, calculated
+  // Data freshness
+  dataSource           String?
+  dataFetchedAt        DateTime
+  createdAt            DateTime @default(now())
+
+  @@index([gameId])
+  @@index([venueId, forecastTime])
+  @@map("weather_snapshots")
+}
+
+// ============================================================================
+// EXTERNAL FACTORS
+// ============================================================================
+
+model ExternalFactorScore {
+  id                      String   @id @default(cuid())
+  gameId                  String
+  game                    Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  factorType              String   // "WEATHER", "REST_TRAVEL", "REFEREE", "COACHING", "PACE", "TRENCH", "KICKER"
+  affectedTeamId          String?  // null if affects both teams
+  score                   Float    // 0-100
+  details                 Json?    // Additional breakdown
+  calculatedAt            DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([gameId, factorType])
+  @@map("external_factor_scores")
+}
+
+model RefereeCrew {
+  id                  String @id @default(cuid())
+  refereeName         String @unique
+  avgPenaltiesPerGame Float?
+  homeFavoritism      Float? // positive = favors home, negative = favors away
+  affectsTotal        Float? // impact on over/under
+  season              Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([season])
+  @@map("referee_crews")
+}
+
+// ============================================================================
+// NEWS & SIGNALS
+// ============================================================================
+
+model NewsItem {
+  id            String   @id @default(cuid())
+  gameId        String?
+  game          Game?    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  teamId        String?  // Optional team association
+  headline      String
+  snippet       String?
+  sourceUrl     String?
+  sourceName    String   // "ESPN", "NFL.com"
+  publishedAt   DateTime
+  sentimentScore Float?  // -1 to 1 (optional signal)
+  confidenceLabel String? // "HIGH", "MEDIUM", "LOW"
+  expiresAt     DateTime?
+  isOptionalSignal Boolean @default(false) // If true, only used when user enables optional factors
+  dataFetchedAt DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([gameId, publishedAt(sort: Desc)])
+  @@map("news_items")
+}
+
+// ============================================================================
+// PREDICTION MODEL
+// ============================================================================
+
+model ModelRun {
+  id                  String   @id @default(cuid())
+  gameId              String
+  game                Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  modelVersion        String   @default("v1.0")
+  // Inputs (stored as JSON for flexibility)
+  baselineInputs      Json     // ELO, recent form, injuries, etc.
+  externalFactors     Json     // Weather, rest, referee, etc.
+  optionalFactors     Json?    // Social signals, rumors (if enabled)
+  optionalFactorsEnabled Boolean @default(false)
+  dataTimestamps      Json     // Timestamp of each data source used
+  // Outputs
+  homeWinProbability  Float    // 0-100
+  projectedHomeSpread Float?   // -3.5
+  projectedTotal      Float?   // 47.5
+  confidenceScore     Int      // 1-5
+  edgeVsMarket        Float?   // Difference vs best available odds
+  recommendation      String   // "BET_HOME", "BET_AWAY", "NO_BET"
+  factorBreakdown     Json     // Explainability: which factors contributed most
+  // Metadata
+  ranAt               DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  @@index([gameId, ranAt(sort: Desc)])
+  @@map("model_runs")
+}
+
+// ============================================================================
+// PROVIDER HEALTH & MONITORING
+// ============================================================================
+
+model ProviderHealthLog {
+  id            String   @id @default(cuid())
+  providerName  String   // "MockScheduleAdapter", "RealOddsAdapter"
+  providerType  String   // "SCHEDULE", "ODDS", "INJURIES", "WEATHER", "STATS", "NEWS"
+  status        String   // "SUCCESS", "TIMEOUT", "ERROR"
+  latencyMs     Int?
+  errorMessage  String?
+  errorStack    String?
+  checkedAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([providerName, checkedAt(sort: Desc)])
+  @@index([status])
+  @@map("provider_health_logs")
+}
+
+// ============================================================================
+// USER SETTINGS (Optional Features)
+// ============================================================================
+
+model UserSettings {
+  id                       String   @id @default(cuid())
+  userId                   String?  @unique // For future user accounts
+  // Optional feature toggles
+  enableSocialSignals      Boolean  @default(false)
+  enableMarketDisagreement Boolean  @default(false)
+  enableRumorSignals       Boolean  @default(false)
+  enablePersonalContext    Boolean  @default(false)
+  // Display preferences
+  preferredOddsFormat      String   @default("AMERICAN") // "AMERICAN", "DECIMAL", "FRACTIONAL"
+  defaultSport             String   @default("nfl")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("user_settings")
+}
