@@ -12,11 +12,11 @@ interface Game {
   venue?: {
     name: string;
     city: string;
-  };
+  } | null;
   oddsSnapshots?: Array<{
-    homeSpread?: number;
-    homeMoneyline?: number;
-    overUnder?: number;
+    homeSpread?: number | null;
+    homeMoneyline?: number | null;
+    overUnder?: number | null;
     dataFetchedAt: Date;
   }>;
 }

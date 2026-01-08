@@ -56,10 +56,10 @@ export class PredictionService {
     // Evaluate data freshness
     const freshness = freshnessService.evaluateFreshness({
       scheduledTime: game.scheduledTime,
-      oddsTimestamp: game.oddsSnapshots[0]?.dataFetchedAt,
-      injuriesTimestamp: game.homeTeam.injuries[0]?.dataFetchedAt,
-      weatherTimestamp: game.weatherSnapshots[0]?.dataFetchedAt,
-      statsTimestamp: game.teamGameStats[0]?.dataFetchedAt,
+      oddsTimestamp: game.oddsSnapshots[0]?.dataFetchedAt ?? undefined,
+      injuriesTimestamp: game.homeTeam.injuries[0]?.dataFetchedAt ?? undefined,
+      weatherTimestamp: game.weatherSnapshots[0]?.dataFetchedAt ?? undefined,
+      statsTimestamp: game.teamGameStats[0]?.dataFetchedAt ?? undefined,
       isOutdoorVenue: !game.venue?.isDome,
     });
 
@@ -109,11 +109,11 @@ export class PredictionService {
         modelVersion: 'v1.0-mvp',
         baselineInputs: baselineInputs,
         externalFactors: {},
-        optionalFactors: null,
+        optionalFactors: undefined,
         optionalFactorsEnabled: false,
         dataTimestamps: {
-          odds: game.oddsSnapshots[0]?.dataFetchedAt,
-          injuries: game.homeTeam.injuries[0]?.dataFetchedAt,
+          odds: game.oddsSnapshots[0]?.dataFetchedAt ?? undefined,
+          injuries: game.homeTeam.injuries[0]?.dataFetchedAt ?? undefined,
         },
         homeWinProbability,
         projectedHomeSpread,

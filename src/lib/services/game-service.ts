@@ -3,21 +3,81 @@
  * Handles game data operations with caching
  */
 
-import { PrismaClient, Game } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { CacheService } from './cache-service';
 
 const prisma = new PrismaClient();
 const cache = new CacheService();
 
+// Type definitions for game queries with relations
+const gameListInclude = Prisma.validator<Prisma.GameInclude>()({
+  homeTeam: true,
+  awayTeam: true,
+  venue: true,
+  oddsSnapshots: {
+    orderBy: {
+      dataFetchedAt: 'desc',
+    },
+    take: 1,
+  },
+});
+
+const gameDetailInclude = Prisma.validator<Prisma.GameInclude>()({
+  homeTeam: {
+    include: {
+      venue: true,
+      injuries: {
+        where: { isResolved: false },
+        include: { player: true },
+      },
+    },
+  },
+  awayTeam: {
+    include: {
+      injuries: {
+        where: { isResolved: false },
+        include: { player: true },
+      },
+    },
+  },
+  venue: true,
+  oddsSnapshots: {
+    orderBy: {
+      dataFetchedAt: 'desc',
+    },
+    take: 10,
+  },
+  weatherSnapshots: {
+    orderBy: {
+      forecastTime: 'asc',
+    },
+  },
+  teamGameStats: {
+    include: {
+      team: true,
+    },
+  },
+  externalFactorScores: true,
+  modelRuns: {
+    orderBy: {
+      ranAt: 'desc',
+    },
+    take: 1,
+  },
+});
+
+export type GameWithRelations = Prisma.GameGetPayload<{ include: typeof gameListInclude }>;
+export type GameDetail = Prisma.GameGetPayload<{ include: typeof gameDetailInclude }>;
+
 export class GameService {
   /**
    * Get games for a specific date
    */
-  async getGamesForDate(date: Date): Promise<Game[]> {
+  async getGamesForDate(date: Date): Promise<GameWithRelations[]> {
     const cacheKey = `games:date:${date.toISOString().split('T')[0]}`;
 
     // Check cache
-    const cached = await cache.get<Game[]>(cacheKey);
+    const cached = await cache.get<GameWithRelations[]>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -46,11 +106,6 @@ export class GameService {
           },
           take: 1,
         },
-        injuries: {
-          where: {
-            isResolved: false,
-          },
-        },
       },
       orderBy: {
         scheduledTime: 'asc',
@@ -66,11 +121,11 @@ export class GameService {
   /**
    * Get game by ID with all related data
    */
-  async getGameById(gameId: string) {
+  async getGameById(gameId: string): Promise<GameDetail> {
     const cacheKey = `game:${gameId}`;
 
     // Check cache
-    const cached = await cache.get(cacheKey);
+    const cached = await cache.get<GameDetail>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -136,10 +191,10 @@ export class GameService {
   /**
    * Get upcoming games (next 7 days)
    */
-  async getUpcomingGames(limit = 20) {
+  async getUpcomingGames(limit = 20): Promise<GameWithRelations[]> {
     const cacheKey = `games:upcoming:${limit}`;
 
-    const cached = await cache.get(cacheKey);
+    const cached = await cache.get<GameWithRelations[]>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -156,6 +211,12 @@ export class GameService {
         homeTeam: true,
         awayTeam: true,
         venue: true,
+        oddsSnapshots: {
+          orderBy: {
+            dataFetchedAt: 'desc',
+          },
+          take: 1,
+        },
       },
       orderBy: {
         scheduledTime: 'asc',

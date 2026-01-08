@@ -22,10 +22,10 @@ export default async function GameDetailPage({ params }: GameDetailPageProps) {
     // Evaluate data freshness
     freshness = freshnessService.evaluateFreshness({
       scheduledTime: game.scheduledTime,
-      oddsTimestamp: game.oddsSnapshots[0]?.dataFetchedAt,
-      injuriesTimestamp: game.homeTeam.injuries[0]?.dataFetchedAt,
-      weatherTimestamp: game.weatherSnapshots[0]?.dataFetchedAt,
-      statsTimestamp: game.teamGameStats[0]?.dataFetchedAt,
+      oddsTimestamp: game.oddsSnapshots[0]?.dataFetchedAt ?? undefined,
+      injuriesTimestamp: game.homeTeam.injuries[0]?.dataFetchedAt ?? undefined,
+      weatherTimestamp: game.weatherSnapshots[0]?.dataFetchedAt ?? undefined,
+      statsTimestamp: game.teamGameStats[0]?.dataFetchedAt ?? undefined,
       isOutdoorVenue: !game.venue?.isDome,
     });
 

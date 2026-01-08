@@ -27,14 +27,19 @@ export function DataFreshnessPanel({ freshness }: DataFreshnessPanelProps) {
   );
 }
 
-function FreshnessItem({ label, result }: { label: string; result: any }) {
-  const statusColors = {
+interface FreshnessItemResult {
+  status: FreshnessStatus;
+  ageMinutes: number;
+}
+
+function FreshnessItem({ label, result }: { label: string; result: FreshnessItemResult }) {
+  const statusColors: Record<FreshnessStatus, string> = {
     [FreshnessStatus.FRESH]: 'bg-green-100 text-green-800',
     [FreshnessStatus.AGING]: 'bg-yellow-100 text-yellow-800',
     [FreshnessStatus.STALE]: 'bg-red-100 text-red-800',
   };
 
-  const statusIcons = {
+  const statusIcons: Record<FreshnessStatus, string> = {
     [FreshnessStatus.FRESH]: '✓',
     [FreshnessStatus.AGING]: '⚠',
     [FreshnessStatus.STALE]: '✗',

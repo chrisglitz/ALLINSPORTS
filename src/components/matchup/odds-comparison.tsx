@@ -1,15 +1,15 @@
 interface OddsSnapshotProps {
   odds: Array<{
     providerName: string;
-    homeMoneyline?: number;
-    awayMoneyline?: number;
-    homeSpread?: number;
-    homeSpreadOdds?: number;
-    awaySpread?: number;
-    awaySpreadOdds?: number;
-    overUnder?: number;
-    overOdds?: number;
-    underOdds?: number;
+    homeMoneyline?: number | null;
+    awayMoneyline?: number | null;
+    homeSpread?: number | null;
+    homeSpreadOdds?: number | null;
+    awaySpread?: number | null;
+    awaySpreadOdds?: number | null;
+    overUnder?: number | null;
+    overOdds?: number | null;
+    underOdds?: number | null;
     dataFetchedAt: Date;
   }>;
 }

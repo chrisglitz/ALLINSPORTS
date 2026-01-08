@@ -14,7 +14,7 @@ export default async function NFLGamesPage({ searchParams }: NFLGamesPageProps) 
     : new Date();
 
   // Fetch games for the selected date
-  let games;
+  let games: Awaited<ReturnType<typeof gameService.getGamesForDate>> = [];
   try {
     games = await gameService.getGamesForDate(selectedDate);
   } catch (error) {
